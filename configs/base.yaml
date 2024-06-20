@@ -1,0 +1,27 @@
+defaults:
+  #- task: Atari-Alien    #used for collect data
+  - task: mix           #used for train multitask LDM
+  - system: multitask_ae_ddpm
+
+  - _self_
+
+device:
+  cuda_visible_devices:  "0"
+  id: 0
+  cuda: cuda:${device.id}
+
+load_system_checkpoint:
+mode: train
+
+seed: 42
+process_title: PDN
+
+output_dir: outputs/${task.exp_name}
+
+hydra:
+  output_subdir: config
+  run:
+    dir: ${output_dir}
+  sweep:
+    dir: ${output_dir}
+    subdir: ${hydra.job.override_dirname}
