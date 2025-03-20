@@ -6,7 +6,6 @@ import pytorch_lightning as pl
 import sys
 import os
 import datetime
-from core.tasks.classification import CFTask
 from core.system import *
 import torch
 import torch.distributed as dist
@@ -27,7 +26,7 @@ def set_device(device_config):
     # set the global cuda device
     torch.backends.cudnn.enabled = True
     os.environ["CUDA_VISIBLE_DEVICES"] = str(device_config.cuda_visible_devices)
-    torch.cuda.set_device(device_config.cuda)
+    #torch.cuda.set_device(device_config.cuda)
     torch.set_float32_matmul_precision("medium")
     # warnings.filterwarnings("always")
 
@@ -93,3 +92,19 @@ def train_task_for_data(cfg, **kwargs):
 
     task_result = task.train_for_data()
     return task_result
+
+def episode_generation(cfg, **kwargs):
+    init_experiment(cfg, **kwargs)
+    task_cls = tasks[cfg.task.name]
+    task = task_cls(cfg.task, **kwargs)
+
+    task.generate_episode_data()
+    return
+
+def train_for_generated_parameter(cfg, **kwargs):
+    init_experiment(cfg, **kwargs)
+    task_cls = tasks[cfg.task.name]
+    task = task_cls(cfg.task, **kwargs)
+
+    task.train_for_generated_parameter()
+    return
