@@ -3,6 +3,8 @@ import torch
 from torch.utils.data import DataLoader, default_collate
 from torch.utils.data import Dataset
 from .base import DataBase
+import os
+import pickle
 
 
 class ConcatDataset(Dataset):
@@ -39,6 +41,7 @@ class MultitaskPData(DataBase):
             data_size = getattr(task_config, "k", 200)
 
             state = torch.load(data_root, map_location="cpu")
+
             if "model" in state:
                 model = state["model"]
                 model.eval()

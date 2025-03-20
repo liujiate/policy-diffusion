@@ -1,19 +1,10 @@
-name: multitask_ae_ddpm
+name: multitask_episode_ddpm
 
-load_episode_vae: True
+load_episode_vae: False
 no_train_last: True
-
-ae_model:
-  _target_: core.module.modules.transformer_ae.TransformerAE
-  d_model: 32
-  nhead: 1
-  depth: 3
-  dim_feedforward: 256
-  dropout: 0.1
-  patch_size: 2048
-  input_noise_factor: 0.001
-  latent_noise_factor: 0.1
-  condition_num: 0
+validate_only_last_two: False
+load_clip: True
+episode_len: 10
 
 model:
   _target_: core.module.modules.dit.DiT
@@ -21,6 +12,7 @@ model:
   depth: 2
   condition_num: 0
   hidden_size: 64
+  class_dropout_prob: 0
 
 beta_schedule:
   start: 1e-4
@@ -34,8 +26,8 @@ loss_type: mse
 
 train:
   split_epoch: 20000
-  ae_eval_batch_size: 20
-  ddpm_eval_batch_size: 20
+  ae_eval_batch_size: 10
+  ddpm_eval_batch_size: 10
   ae_use_condition: false
   optimizer:
     _target_: torch.optim.AdamW
@@ -52,14 +44,15 @@ train:
   trainer:
     _target_: pytorch_lightning.Trainer
     _convert_: all
-    max_epochs: 80000
-    check_val_every_n_epoch:
-    val_check_interval : 5000
+    max_epochs: 300000
+    check_val_every_n_epoch: 5000
+    #val_check_interval : 5000
     log_every_n_steps: 10
     limit_val_batches: 1
     limit_test_batches: 1
-    devices:
-      - ${device.id}
+    devices: ${device.id}
+    #strategy: ddp_find_unused_parameters_true
+      #- ${device.id}
 
     enable_model_summary: false
 
@@ -67,7 +60,7 @@ train:
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
       monitor: 'mean_g_acc'
       mode: 'max'
-      save_top_k: 1
+      save_top_k: 10
       save_last: true
       verbose: true
       filename: 'ddpm-{epoch}-{mean_g_acc:.4f}'

@@ -16,16 +16,17 @@ from core.utils.ddpm import *
 from core.utils.utils import *
 from core.module.prelayer.latent_transformer import Param2Latent
 from .ddpm import DDPM
+from .multitask_ae_ddpm import MultitaskAE_DDPM
 import json
 from core.episode.episode_vae import EpisodeVAE
 
-class MultitaskAE_DDPM(DDPM):
+class MultitaskVQVAE_DDPM(MultitaskAE_DDPM):
     def __init__(self, config, **kwargs):
         self.task_cfg = config.task
         print(self.task_cfg)
 
         ae_model = hydra.utils.instantiate(config.system.ae_model)
-        super(MultitaskAE_DDPM, self).__init__(config)
+        super(MultitaskVQVAE_DDPM, self).__init__(config)
         self.save_hyperparameters()
         self.split_epoch = self.train_cfg.split_epoch
         self.ae_use_condition = self.train_cfg.ae_use_condition
@@ -35,6 +36,7 @@ class MultitaskAE_DDPM(DDPM):
 
         self.load_episode_vae = getattr(config.system, "load_episode_vae", None)
         self.no_train_last = getattr(config.system, "no_train_last", None)
+        self.validate_only_last_two = getattr(config.system, "validate_only_last_two", None)
         if self.load_episode_vae:
             img_input_dim = 84 * 84 * 4  # Atari图像大小
             token_dim = 32
@@ -78,15 +80,20 @@ class MultitaskAE_DDPM(DDPM):
         print("all_preformance: ", self.all_performance)
 
 
-    def ae_forward(self, batch, condition=None, condition2=None,**kwargs):
-        output = self.ae_model(batch, condition=condition, condition2=condition2)
-        loss = self.loss_func(batch, output, **kwargs)
-        return loss
+    def ae_forward(self, batch, condition=None, condition2=None, **kwargs):
+        output, commit_loss = self.ae_model.forward(batch)
+        reconstruction_loss = self.loss_func(batch, output, **kwargs)
+        loss = reconstruction_loss + commit_loss
+        # self.log("commit_loss", commit_loss)
+        # self.log("reconstruction_loss", reconstruction_loss)
+        return loss, reconstruction_loss, commit_loss
 
     def training_step(self, batch, batch_idx, **kwargs):
         ddpm_optimizer, ae_optimizer = self.optimizers()
         if self.current_epoch < self.split_epoch:
             loss = torch.tensor(0.0).cuda()
+            commit_loss = torch.tensor(0.0).cuda()
+            reconstruction_loss = torch.tensor(0.0).cuda()
             ae_optimizer.zero_grad()
             for i, (task_name, task_config) in enumerate(self.task_cfg.tasks.items()):
                 if self.no_train_last and i == len(self.task_cfg.tasks) - 1:
@@ -96,19 +103,30 @@ class MultitaskAE_DDPM(DDPM):
                     pdata, episode = inputs
                     mu, logvar = self.episode_model.encode(episode)
                     cond = self.episode_model.reparameterize(mu, logvar)
-                    loss += self.ae_forward(pdata, condition2=cond,**kwargs)
+                    loss += self.ae_forward(pdata, condition2=cond, **kwargs)
                 else:
                     if self.ae_use_condition:
-                        loss += self.ae_forward(inputs, condition=torch.full((inputs.shape[0],), i).int().to(inputs.device), **kwargs)
+                        loss += self.ae_forward(inputs,
+                                                condition=torch.full((inputs.shape[0],), i).int().to(inputs.device),
+                                                **kwargs)
                     else:
-                        loss += self.ae_forward(inputs, **kwargs)
+                        cur_loss, cur_reconstruction_loss, cur_commit_loss = self.ae_forward(inputs, **kwargs)
+                        loss += cur_loss
+                        reconstruction_loss += cur_reconstruction_loss
+                        commit_loss += cur_commit_loss
             if self.no_train_last:
                 loss /= len(self.task_cfg.tasks) - 1
+                reconstruction_loss /= len(self.task_cfg.tasks) - 1
+                commit_loss /= len(self.task_cfg.tasks) - 1
             else:
                 loss /= len(self.task_cfg.tasks)
+                reconstruction_loss /= len(self.task_cfg.tasks)
+                commit_loss /= len(self.task_cfg.tasks)
             self.manual_backward(loss, retain_graph=True)
             ae_optimizer.step()
-            self.log("ae_loss", loss.cpu().detach().mean().item(), on_epoch=True, prog_bar=True, logger=True)
+            self.log("vqvae_loss", loss.cpu().detach().mean().item(), on_epoch=True, prog_bar=True, logger=True)
+            self.log("commit_loss", commit_loss)
+            self.log("reconstruction_loss", reconstruction_loss)
         else:
             loss = torch.tensor(0.0).cuda()
             ddpm_optimizer.zero_grad()
@@ -176,49 +194,74 @@ class MultitaskAE_DDPM(DDPM):
 
     def ae_validate_step(self, batch, num):
         params = {}
-        for i, (task_name, task_config) in enumerate(self.task_cfg.tasks.items()):
-            if self.load_episode_vae:
-                params[task_name], _ = batch[i]
-            else:
-                params[task_name] = batch[i]
-        input_metrics = self.eval_params(params, num)
+        # for i, (task_name, task_config) in enumerate(self.task_cfg.tasks.items()):
+        #     if self.validate_only_last_two and i < len(self.task_cfg.tasks) - 2:
+        #         continue
+        #     if self.load_episode_vae:
+        #         params[task_name], _ = batch[i]
+        #     else:
+        #         params[task_name] = batch[i]
+        # input_metrics = self.eval_params(params, num)
 
         print("Test AE params")
         ae_params = {}
         for i, (task_name, task_config) in enumerate(self.task_cfg.tasks.items()):
-            #condition = torch.full((batch[i].shape[0],), i).int().to(batch[i].device)
-            # latent = self.ae_model.encode(batch[i], condition=condition)
-            # ae_params[task_name] = self.ae_model.decode(latent, condition=condition)
+            if self.validate_only_last_two and i < len(self.task_cfg.tasks) - 2:
+                continue
             if self.load_episode_vae:
                 pdata, episode = batch[i]
                 mu, logvar = self.episode_model.encode(episode)
                 cond2 = self.episode_model.reparameterize(mu, logvar)
-                latent = self.ae_model.encode(pdata, condition=cond2)
-                ae_params[task_name] = self.ae_model.decode(latent, condition=cond2)
+                quantized, vq_loss = self.ae_model.encode(pdata, condition=cond2)
+                ae_params[task_name] = self.ae_model.decode(quantized, condition=cond2)
             else:
                 condition = torch.full((batch[i].shape[0],), i).int().to(batch[i].device)
                 if self.ae_use_condition:
-                    latent = self.ae_model.encode(batch[i], condition=condition)
+                    quantized, vq_loss = self.ae_model.encode(batch[i], condition=condition)
                 else:
-                    latent = self.ae_model.encode(batch[i])
-                print("{} latent shape:{}".format(task_name, latent.shape))
+                    quantized, vq_loss = self.ae_model.encode(batch[i])
+                #print("{} quantized shape:{}".format(task_name, quantized.shape))
                 if self.ae_use_condition:
-                    ae_params[task_name] = self.ae_model.decode(latent, condition=condition)
+                    ae_params[task_name] = self.ae_model.decode(quantized, condition=condition)
                 else:
-                    ae_params[task_name] = self.ae_model.decode(latent)
+                    ae_params[task_name] = self.ae_model.decode(quantized)
+                reconstruction_loss = self.loss_func(batch[i], ae_params[task_name])
+                self.log("val_commit_loss_" + task_name, torch.tensor(vq_loss))
+                self.log("val_reconstruction_loss_" + task_name, torch.tensor(reconstruction_loss))
         ae_metrics = self.eval_params(ae_params, num)
 
+        # for task_name in ae_metrics.keys():
+        #     mean_score = np.clip((ae_metrics[task_name].mean() - input_metrics[task_name].mean()) / np.abs(
+        #         input_metrics[task_name].mean()) + 1, -1, 1.5)
+        #     print(
+        #         f"{task_name}: Input model best return: {np.max(input_metrics[task_name])}, AE model best return: {np.max(ae_metrics[task_name])}")
+        #     print(
+        #         f"{task_name}: Input model mean return: {np.mean(input_metrics[task_name])}, AE model mean return: {np.mean(ae_metrics[task_name])}, mean score: {mean_score}")
+        #     print(
+        #         f"{task_name}: Input model median return: {np.median(input_metrics[task_name])}, AE model median return: {np.median(ae_metrics[task_name])}")
+        #     print(
+        #         f"{task_name}: Input model std return: {np.std(input_metrics[task_name])}, AE model std return: {np.std(ae_metrics[task_name])}")
+        #     print()
+        #     self.log("task_score_" + task_name, torch.tensor(mean_score))
+        #
+        # all_task_score = np.mean(np.clip(
+        #     [(ae_metrics[task_name].mean() - input_metrics[task_name].mean()) / np.abs(
+        #         input_metrics[task_name].mean()) + 1 for task_name in ae_metrics.keys()], -1, 1.5))
+
         for task_name in ae_metrics.keys():
-            mean_score = np.clip((ae_metrics[task_name].mean() - input_metrics[task_name].mean()) / np.abs(input_metrics[task_name].mean()) + 1, -1, 1.5)
-            print(f"{task_name}: Input model best return: {np.max(input_metrics[task_name])}, AE model best return: {np.max(ae_metrics[task_name])}")
-            print(f"{task_name}: Input model mean return: {np.mean(input_metrics[task_name])}, AE model mean return: {np.mean(ae_metrics[task_name])}, mean score: {mean_score}")
-            print(f"{task_name}: Input model median return: {np.median(input_metrics[task_name])}, AE model median return: {np.median(ae_metrics[task_name])}")
-            print(f"{task_name}: Input model std return: {np.std(input_metrics[task_name])}, AE model median return: {np.std(ae_metrics[task_name])}")
+            mean_score = np.clip((ae_metrics[task_name].mean() - self.all_performance[task_name]["mean"]) / np.abs(self.all_performance[task_name]["mean"]) + 1, -1, 1.5)
+            print(f"{task_name}: AE model best return: {np.max(ae_metrics[task_name])}")
+            print(f"{task_name}: AE model mean return: {np.mean(ae_metrics[task_name])}, mean score: {mean_score}")
+            print(f"{task_name}: AE model median return: {np.median(ae_metrics[task_name])}")
+            print(f"{task_name}: AE model std return: {np.std(ae_metrics[task_name])}")
             print()
             self.log("task_score_" + task_name, torch.tensor(mean_score))
 
         all_task_score = np.mean(np.clip(
-            [(ae_metrics[task_name].mean() - input_metrics[task_name].mean()) / np.abs(input_metrics[task_name].mean()) + 1 for task_name in ae_metrics.keys()], -1, 1.5))
+            [(np.mean(ae_metrics[task_name]) - self.all_performance[task_name]["mean"]) / np.abs(
+                self.all_performance[task_name]["mean"]) + 1 for task_name in ae_metrics.keys()], -1, 1.5))
+
+
         print("all_task_score: ", all_task_score)
         print("---------------------------------")
         self.log("mean_ae_acc", torch.tensor(all_task_score))
@@ -274,7 +317,13 @@ class MultitaskAE_DDPM(DDPM):
         return {'mean_g_acc': all_task_score}
     
     def eval_params(self, params, num):
-        metrics = {task_name: list() for task_name in self.task_cfg.tasks.keys()}
+        if self.validate_only_last_two:
+            task_names = list(self.task_cfg.tasks.keys())[-2:]
+        else:
+            task_names = list(self.task_cfg.tasks.keys())
+
+        metrics = {task_name: list() for task_name in task_names}
+
         print(f"Evaluating parameters ...")
         for i in tqdm(range(num)):
             result = self.task_func({task_name: params[task_name][i] for task_name in params.keys()})

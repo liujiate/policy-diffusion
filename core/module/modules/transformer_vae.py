@@ -84,39 +84,40 @@ class TransformerDecoder(nn.Module):
         return output
 
 
-class TransformerAE(nn.Module):
-    def __init__(self, d_model, nhead, depth, condition_num=0, dim_feedforward=2048, dropout=0.1, patch_size=64, input_noise_factor=0.001, latent_noise_factor=0.1):
-        super(TransformerAE, self).__init__()
+class TransformerAE_old(nn.Module):
+    def __init__(self, in_dim, d_model, nhead, nlayer, condition_num=0, dim_feedforward=2048, dropout=0.1, patch_size=64, input_noise_factor=0.001, latent_noise_factor=0.1, depth=1):
+        super(TransformerAE_old, self).__init__()
         self.patch_size = patch_size
         self.input_noise_factor = input_noise_factor
         self.latent_noise_factor = latent_noise_factor
-        self.condition_num = condition_num
-        if self.condition_num != 0:
+        if condition_num != 0:
             self.y_embedder = LabelEmbedder(condition_num, d_model, 0)
         self.embed_layer = nn.Linear(self.patch_size, d_model)
         self.decode_layer = nn.Linear(d_model, self.patch_size)
-        self.encoder = TransformerEncoder(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=depth, dropout=dropout)
-        self.decoder = TransformerDecoder(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=depth, dropout=dropout)
+        self.encoder = TransformerEncoder(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=nlayer, dropout=dropout)
+        self.decoder = TransformerDecoder(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=nlayer, dropout=dropout)
 
         # self.encoder_blocks = nn.ModuleList([
-        #     TransformerEncoder(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=nlayer, dropout=dropout) for _ in range(depth)
+        #     TransformerEncoder(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=nlayer, dropout=dropout)
         # ])
         # self.decoder_blocks = nn.ModuleList([
-        #     TransformerDecoder(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=nlayer, dropout=dropout) for _ in range(depth)
+        #     TransformerDecoder(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=nlayer, dropout=dropout)
         # ])
 
     def encode(self, input, condition=None):
         bs, self.input_dim = input.shape
         pad_size = self.patch_size - (self.input_dim % self.patch_size)
+        # if condition is not None:
+        #     input_pad = torch.cat([input, condition.reshape([input.shape[0], 1]).repeat(1, pad_size).to(input.device)], dim=1)
+        # else:
         input_pad = torch.cat([input, torch.zeros(bs, pad_size).to(input.device)], dim=1)
 
         input_seq = input_pad.reshape(bs, -1, self.patch_size)
         input_seq = self.add_noise(input_seq, self.input_noise_factor)
 
         embeddings = self.embed_layer(input_seq)
-        if self.condition_num != 0 and condition is not None:
-            condition = self.y_embedder(condition)
         if condition is not None:
+            condition = self.y_embedder(condition)
             embeddings = torch.cat([condition.unsqueeze(1), embeddings], dim=1)
 
         latent = self.encoder(embeddings)
@@ -128,9 +129,8 @@ class TransformerAE(nn.Module):
     def decode(self, latent, condition=None):
         bs = latent.shape[0]
         embeddings = self.add_noise(latent, self.latent_noise_factor)
-        if self.condition_num != 0 and condition is not None:
-            condition = self.y_embedder(condition)
         if condition is not None:
+            condition = self.y_embedder(condition)
             embeddings = torch.cat([condition.unsqueeze(1), latent], dim=1)
 
         output = self.decoder(embeddings, embeddings)
@@ -144,15 +144,80 @@ class TransformerAE(nn.Module):
         output = output[:, : self.input_dim]
         return output
 
-    def forward(self, input, condition=None, condition2=None):
-        if condition != None and condition2 == None:
-            latent = self.encode(input, condition)
-            output = self.decode(latent, condition)
-        elif condition2 != None and condition == None:
-            latent = self.encode(input, condition2)
-            output = self.decode(latent, condition2)
-        else:
-            raise Exception
+    def forward(self, input, condition=None):
+        latent = self.encode(input, condition)
+        output = self.decode(latent, condition)
+        return output
+
+    def add_noise(self, x, noise_factor):
+        if not isinstance(noise_factor, float):
+            assert len(noise_factor) == 2
+            noise_factor = random.uniform(noise_factor[0], noise_factor[1])
+        return torch.randn_like(x) * noise_factor + x * (1 - noise_factor)
+
+class TransformerAE(nn.Module):
+    def __init__(self, in_dim, d_model, nhead, nlayer, condition_num=0, dim_feedforward=2048, dropout=0.1, patch_size=64, input_noise_factor=0.001, latent_noise_factor=0.1, depth=1):
+        super(TransformerAE, self).__init__()
+        self.patch_size = patch_size
+        self.input_noise_factor = input_noise_factor
+        self.latent_noise_factor = latent_noise_factor
+        if condition_num != 0:
+            self.y_embedder = LabelEmbedder(condition_num, d_model, 0)
+        self.embed_layer = nn.Linear(self.patch_size, d_model)
+        self.decode_layer = nn.Linear(d_model, self.patch_size)
+        # self.encoder = TransformerEncoder(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=nlayer, dropout=dropout)
+        # self.decoder = TransformerDecoder(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=nlayer, dropout=dropout)
+
+        self.encoder_blocks = nn.ModuleList([
+            TransformerEncoder(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=nlayer, dropout=dropout) for _ in range(depth)
+        ])
+        self.decoder_blocks = nn.ModuleList([
+            TransformerDecoder(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=nlayer, dropout=dropout) for _ in range(depth)
+        ])
+
+    def encode(self, input, condition=None):
+        bs, self.input_dim = input.shape
+        pad_size = self.patch_size - (self.input_dim % self.patch_size)
+        # if condition is not None:
+        #     input_pad = torch.cat([input, condition.reshape([input.shape[0], 1]).repeat(1, pad_size).to(input.device)], dim=1)
+        # else:
+        input_pad = torch.cat([input, torch.zeros(bs, pad_size).to(input.device)], dim=1)
+
+        input_seq = input_pad.reshape(bs, -1, self.patch_size)
+        input_seq = self.add_noise(input_seq, self.input_noise_factor)
+
+        embeddings = self.embed_layer(input_seq)
+        if condition is not None:
+            condition = self.y_embedder(condition)
+            embeddings = torch.cat([condition.unsqueeze(1), embeddings], dim=1)
+
+        #latent = self.encoder(embeddings)
+        for block in self.encoder_blocks:
+            embeddings = block(embeddings)
+        latent = embeddings
+        return latent
+
+    def decode(self, latent, condition=None):
+        bs = latent.shape[0]
+        embeddings = self.add_noise(latent, self.latent_noise_factor)
+        if condition is not None:
+            condition = self.y_embedder(condition)
+            embeddings = torch.cat([condition.unsqueeze(1), latent], dim=1)
+
+        #output = self.decoder(embeddings, embeddings)
+        output = embeddings
+        for block in self.decoder_blocks:
+            output = block(output, embeddings)
+
+        output = self.decode_layer(output)
+
+        output = output.reshape(bs, -1)
+        output = output[:, : self.input_dim]
+        return output
+
+    def forward(self, input, condition=None):
+        latent = self.encode(input, condition)
+        output = self.decode(latent, condition)
         return output
 
     def add_noise(self, x, noise_factor):

@@ -1,19 +1,20 @@
-name: multitask_ae_ddpm
+name: multitask_vqvae_ddpm
 
-load_episode_vae: True
+load_episode_vae: False
 no_train_last: True
+validate_only_last_two: True
 
 ae_model:
-  _target_: core.module.modules.transformer_ae.TransformerAE
+  _target_: core.module.modules.vqvae.VQVAETransformer
   d_model: 32
   nhead: 1
   depth: 3
   dim_feedforward: 256
   dropout: 0.1
   patch_size: 2048
-  input_noise_factor: 0.001
-  latent_noise_factor: 0.1
   condition_num: 0
+  num_embeddings: 512
+  commitment_cost: 0.25
 
 model:
   _target_: core.module.modules.dit.DiT

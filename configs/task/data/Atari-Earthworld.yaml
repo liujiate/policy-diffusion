@@ -1,6 +1,6 @@
 name: rl
 
-exp_name: Atari-Assault
+exp_name: Atari-Earthworld
 
 train:
   eval_freq: 5000
@@ -17,13 +17,13 @@ train:
   param_dim: 9234
 
 env:
-  name: AssaultNoFrameskip-v4
+  name: EarthworldNoFrameskip-v4
   n_eval_episodes: 10
   num_envs: 10
   seed: 42
 
 param:
-    data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Assault/200/data.pt
+    data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Earthworld/200/data.pt
     k: 200
     num_workers: 4
 

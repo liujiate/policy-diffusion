@@ -59,7 +59,10 @@ class DDPM(BaseSystem):
     def generate(self, batch, num=10, history=False, cond=None):
         model = self.model.ema if hasattr(self.model, 'ema') else self.model
         model.eval()
-        shape = (num, 1, batch.shape[1] * batch.shape[2])
+        if len(batch.shape) > 2:
+            shape = (num, 1, batch.shape[1] * batch.shape[2])
+        else:
+            shape = (num, 1, batch.shape[1])
         sample = self.progressive_samples_fn_simple(
             model,
             shape,

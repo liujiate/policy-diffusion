@@ -1,6 +1,8 @@
 import gym
 import numpy as np
 from stable_baselines3 import PPO
+from core.utils.env import make_vector_env
+import os
 
 # 假设你已经训练好了多个agents，并且它们保存在以下路径
 agent_paths = {
@@ -11,8 +13,10 @@ agent_paths = {
 
 
 # 生成数据的函数
-def generate_episode_data(env_name, agent_path, num_episodes=100):
-    env = gym.make(env_name)
+def generate_episode_data(env_name, agent_path, num_envs=10, num_episodes=100):
+    #env = gym.make(env_name)
+    env = make_vector_env(env_name, num_envs,
+                    normalization_path=os.path.join(self.cfg.train.save_path, "vecnormalize.pkl"))
     model = PPO.load(agent_path)
 
     episodes_data = []

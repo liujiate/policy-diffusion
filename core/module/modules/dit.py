@@ -170,6 +170,13 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, max_len=1000):
     emb = np.concatenate([emb_sin, emb_cos], axis=1)  # (M, D)
     return emb
 
+class FeatureReducer(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(FeatureReducer, self).__init__()
+        self.linear = nn.Linear(input_dim, output_dim)
+
+    def forward(self, x):
+        return self.linear(x)
 
 class DiT(nn.Module):
     def __init__(
@@ -187,8 +194,10 @@ class DiT(nn.Module):
         self.patch_size = patch_size
         self.hidden_size = hidden_size
         self.condition_num = condition_num
+        self.class_dropout_prob = class_dropout_prob
 
         self.patch_embedder = PatchEmbed(patch_size=self.patch_size, embed_dim=self.hidden_size)
+        self.feature_reducer = FeatureReducer(512, self.hidden_size)
         if self.condition_num != 0:
             print(self.condition_num)
             self.y_embedder = LabelEmbedder(condition_num, hidden_size, class_dropout_prob)
@@ -237,6 +246,17 @@ class DiT(nn.Module):
         nn.init.constant_(self.final_layer.linear.weight, 0)
         nn.init.constant_(self.final_layer.linear.bias, 0)
 
+    def token_drop(self, embeddings, force_drop_ids=None):
+        """
+        Drops embeddings to enable classifier-free guidance.
+        """
+        if force_drop_ids is None:
+            drop_ids = torch.rand(embeddings.shape[0], device=embeddings.device) < self.class_dropout_prob
+        else:
+            drop_ids = force_drop_ids == 1
+        embeddings = torch.where(drop_ids.unsqueeze(1), torch.zeros_like(embeddings), embeddings)
+        return embeddings
+
     def forward(self, input, time, cond=None):
         input_shape = input.shape
         if len(input.size()) > 2:
@@ -257,8 +277,19 @@ class DiT(nn.Module):
             input = input.reshape(input_view_shape[0], -1, self.patch_size)
         x = self.patch_embedder(input) + self.pos_embed[:, :input.size(1)]
         time_emb = self.t_embedder(time)
-        if cond != None:
+        if cond != None and self.condition_num != 0:
             cond = self.y_embedder(cond, self.training)
+            c = time_emb + cond
+        elif cond != None:
+            # reduced_features = self.feature_reducer(cond)
+            # #print("Reduced features shape:", reduced_features.shape)  # 应该是 (10, 64)
+            # pooled_features = torch.mean(reduced_features, dim=1)
+            # #print("Pooled features shape:", pooled_features.shape)  # 应该是 (64)
+            # cond = pooled_features
+
+
+            if self.training:
+                cond = self.token_drop(cond)
             c = time_emb + cond
         else:
             c = time_emb

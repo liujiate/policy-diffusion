@@ -52,7 +52,7 @@ class RLZoo3Trainer():
             "log_folder": log_folder,
             "seed": -1,
             "vec_env": "dummy",
-            "device": "auto",
+            "device": "cuda",
             "n_trials": 500,
             "max_total_trials": None,
             "optimize_hyperparameters": False,
