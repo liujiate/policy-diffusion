@@ -1,9 +1,10 @@
 name: multitask_episode_ddpm
 
 load_episode_vae: False
-no_train_last: True
+no_train_last: False
 validate_only_last_two: False
-load_clip: True
+load_clip: False
+load_vit: True
 episode_len: 10
 
 model:
@@ -25,7 +26,7 @@ model_var_type: fixedlarge
 loss_type: mse
 
 train:
-  split_epoch: 20000
+  split_epoch: 0
   ae_eval_batch_size: 10
   ddpm_eval_batch_size: 10
   ae_use_condition: false

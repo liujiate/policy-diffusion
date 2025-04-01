@@ -66,6 +66,18 @@ class MultitaskEpisode_DDPM(DDPM):
             self.processor = CLIPProcessor.from_pretrained(model_name)
             # for name, param in self.clip_model.named_parameters():
             #     print(f"{name} is on {param.device}")
+        self.load_vit = getattr(config.system, "load_vit", None)
+        if self.load_vit:
+            vit_model_name = "/mnt/kaiwu-group-x3/jiateliu/models/vit-base-patch16-224"  # 如使用huggingface的vit-base-patch16-224
+            from transformers import ViTImageProcessor, ViTModel
+            self.vit_model = ViTModel.from_pretrained(vit_model_name)
+            self.vit_model.cuda()
+            self.vit_model.eval()
+            self.vit_processor = ViTImageProcessor.from_pretrained(vit_model_name)
+            
+            # 添加特征降维层，将ViT的768维特征降至模型所需的hidden_size维度
+            self.vit_feature_reducer = nn.Linear(768, self.model.hidden_size)
+            self.vit_feature_reducer.cuda()
 
         self.load_history_ae = getattr(config.system, "ae_path", None)
         if getattr(config.system, "ae_path", None) is not None:
@@ -154,6 +166,85 @@ class MultitaskEpisode_DDPM(DDPM):
                 image_features = self.clip_model.get_image_features(**clip_inputs)
                 cond = image_features.view(episode.shape[0], self.episode_len, -1).cuda()
                 loss += self.forward(pdata, cond=torch.full((pdata.shape[0],), i).int().to(pdata.device), cond2=cond, **kwargs)
+            elif self.load_vit:
+                pdata, episode = inputs
+                # 打印episode的形状以便调试
+                # print(f"Episode shape: {episode.shape}")  # 应该是[batch_size, episode_len, h, w, c]
+                
+                batch_size = episode.shape[0]
+                seq_len = episode.shape[1]
+                
+                # 为每个样本随机选择一帧
+                random_indices = torch.randint(0, seq_len, (batch_size,))
+                
+                # 收集所有随机选择的帧
+                random_frames = []
+                for i in range(batch_size):
+                    # 获取当前样本的随机帧
+                    frame = episode[i, random_indices[i]]
+                    # 转换为PIL图像
+                    if frame.max() <= 1.0:  # 如果值在[0,1]范围内
+                        frame = (frame * 255).byte()
+                    frame_np = frame.cpu().numpy().astype(np.uint8)
+                    
+                    # 确保图像格式正确
+                    if len(frame_np.shape) == 2:  # 灰度图
+                        # 转换为RGB
+                        frame_rgb = np.stack([frame_np] * 3, axis=2)
+                        pil_img = Image.fromarray(frame_rgb, 'RGB')
+                    elif len(frame_np.shape) == 3:
+                        if frame_np.shape[2] == 1:  # 单通道
+                            frame_rgb = np.repeat(frame_np, 3, axis=2)
+                            pil_img = Image.fromarray(frame_rgb.squeeze(), 'RGB')
+                        elif frame_np.shape[2] == 3:  # RGB
+                            pil_img = Image.fromarray(frame_np, 'RGB')
+                        elif frame_np.shape[2] == 4:  # RGBA
+                            pil_img = Image.fromarray(frame_np, 'RGBA').convert('RGB')
+                        else:
+                            # 假设是HWC格式但通道数不是标准的
+                            pil_img = Image.fromarray(frame_np[:,:,0], 'L').convert('RGB')
+                    else:
+                        # 不支持的格式，使用灰度图转换
+                        print(f"警告: 遇到不支持的图像格式 {frame_np.shape}")
+                        dummy = np.zeros((84, 84, 3), dtype=np.uint8)
+                        pil_img = Image.fromarray(dummy, 'RGB')
+                    
+                    random_frames.append(pil_img)
+                
+                # 可以保存第一张图像用于调试
+                # if random_frames:
+                #     random_frames[0].save('/tmp/vit_input_sample.png')
+                
+                # 使用ViT处理器处理图像
+                # try:
+                # 先获取处理后的输入数据
+                vit_inputs = self.vit_processor(images=random_frames, return_tensors="pt")
+                
+                # 分别处理不同类型的张量，保持正确的数据类型
+                for key in vit_inputs:
+                    if key == 'pixel_values':
+                        # 像素值是浮点型
+                        vit_inputs[key] = vit_inputs[key].to(pdata.device)
+                    else:
+                        # 其他输入可能是整型，使用long()确保类型正确
+                        vit_inputs[key] = vit_inputs[key].long().to(pdata.device)
+                
+                # 获取ViT特征
+                with torch.no_grad():
+                    vit_output = self.vit_model(**vit_inputs)
+                    vit_features = vit_output.last_hidden_state[:, 0]  # 使用CLS token作为特征
+                    
+                    # 使用特征降维层将768维特征降至64维
+                    vit_features_reduced = self.vit_feature_reducer(vit_features)
+                
+                loss += self.forward(pdata, cond=None, cond2=vit_features_reduced, **kwargs)
+                # except Exception as e:
+                #     print(f"ViT处理出错: {e}")
+                #     print(f"VIT输入的keys: {vit_inputs.keys() if 'vit_inputs' in locals() else '未创建'}")
+                #     for key in vit_inputs.keys() if 'vit_inputs' in locals() else []:
+                #         print(f"Key: {key}, 类型: {vit_inputs[key].dtype}, 形状: {vit_inputs[key].shape}")
+                #     # 出错时退回到基本条件
+                #     loss += self.forward(pdata, cond=torch.full((pdata.shape[0],), i).int().to(pdata.device), **kwargs)
             else:
                 loss += self.forward(inputs, cond=torch.full((inputs.shape[0],), i).int().to(inputs.device), **kwargs)
         if self.no_train_last:
@@ -200,6 +291,9 @@ class MultitaskEpisode_DDPM(DDPM):
                 idx = np.random.choice(batch[0][0].shape[0], self.train_cfg.ddpm_eval_batch_size, replace=False)
                 random_val_batch = [(b[0][idx], b[1][idx]) for b in batch]
             elif self.load_clip:
+                idx = np.random.choice(batch[0][0].shape[0], self.train_cfg.ddpm_eval_batch_size, replace=False)
+                random_val_batch = [(b[0][idx], b[1][idx]) for b in batch]
+            elif self.load_vit:
                 idx = np.random.choice(batch[0][0].shape[0], self.train_cfg.ddpm_eval_batch_size, replace=False)
                 random_val_batch = [(b[0][idx], b[1][idx]) for b in batch]
             else:
@@ -306,6 +400,82 @@ class MultitaskEpisode_DDPM(DDPM):
 
                 cur_batch = self.generate(latent, cond=cond, num=num)
                 output_params[task_name] = cur_batch
+            elif self.load_vit:
+                input_params[task_name], episode = batch[i]
+                latent = input_params[task_name]
+                
+                # 保持与training_step一致的处理方式
+                batch_size = episode.shape[0]
+                seq_len = episode.shape[1]
+                
+                # 为每个样本随机选择一帧
+                random_indices = torch.randint(0, seq_len, (batch_size,))
+                
+                # 收集所有随机选择的帧
+                random_frames = []
+                for j in range(batch_size):
+                    # 获取当前样本的随机帧
+                    frame = episode[j, random_indices[j]]
+                    # 转换为PIL图像
+                    if frame.max() <= 1.0:  # 如果值在[0,1]范围内
+                        frame = (frame * 255).byte()
+                    frame_np = frame.cpu().numpy().astype(np.uint8)
+                    
+                    # 确保图像格式正确
+                    if len(frame_np.shape) == 2:  # 灰度图
+                        frame_rgb = np.stack([frame_np] * 3, axis=2)
+                        pil_img = Image.fromarray(frame_rgb, 'RGB')
+                    elif len(frame_np.shape) == 3:
+                        if frame_np.shape[2] == 1:  # 单通道
+                            frame_rgb = np.repeat(frame_np, 3, axis=2)
+                            pil_img = Image.fromarray(frame_rgb.squeeze(), 'RGB')
+                        elif frame_np.shape[2] == 3:  # RGB
+                            pil_img = Image.fromarray(frame_np, 'RGB')
+                        elif frame_np.shape[2] == 4:  # RGBA
+                            pil_img = Image.fromarray(frame_np, 'RGBA').convert('RGB')
+                        else:
+                            pil_img = Image.fromarray(frame_np[:,:,0], 'L').convert('RGB')
+                    else:
+                        print(f"警告: 遇到不支持的图像格式 {frame_np.shape}")
+                        dummy = np.zeros((84, 84, 3), dtype=np.uint8)
+                        pil_img = Image.fromarray(dummy, 'RGB')
+                    
+                    random_frames.append(pil_img)
+                
+                # 使用ViT处理器处理图像
+                # try:
+                # 先获取处理后的输入数据
+                vit_inputs = self.vit_processor(images=random_frames, return_tensors="pt")
+                
+                # 分别处理不同类型的张量，保持正确的数据类型
+                for key in vit_inputs:
+                    if key == 'pixel_values':
+                        # 像素值是浮点型
+                        vit_inputs[key] = vit_inputs[key].to(latent.device)
+                    else:
+                        # 其他输入可能是整型，使用long()确保类型正确
+                        vit_inputs[key] = vit_inputs[key].long().to(latent.device)
+                
+                # 获取ViT特征
+                with torch.no_grad():
+                    vit_output = self.vit_model(**vit_inputs)
+                    vit_features = vit_output.last_hidden_state[:, 0]  # 使用CLS token作为特征
+                
+                # 使用特征降维层将768维特征降至64维
+                vit_features_reduced = self.vit_feature_reducer(vit_features)
+                
+                # 使用降维后的特征
+                cur_batch = self.generate(latent, cond=vit_features_reduced, num=num)
+                output_params[task_name] = cur_batch
+                # except Exception as e:
+                #     print(f"验证时ViT处理出错: {e}")
+                #     print(f"VIT输入的keys: {vit_inputs.keys() if 'vit_inputs' in locals() else '未创建'}")
+                #     for key in vit_inputs.keys() if 'vit_inputs' in locals() else []:
+                #         print(f"Key: {key}, 类型: {vit_inputs[key].dtype}, 形状: {vit_inputs[key].shape}")
+                #     # 出错时退回到基本条件
+                #     condition = torch.full((latent.shape[0],), i).int().to(latent.device)
+                #     cur_batch = self.generate(latent, cond=condition, num=num)
+                #     output_params[task_name] = cur_batch
             else:
                 input_params[task_name] = batch[i]
                 condition = torch.full((batch[i].shape[0],), i).int().to(batch[i].device)
