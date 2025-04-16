@@ -8,6 +8,7 @@ load_vit: True
 episode_len: 10
 testing_erase: True
 erase_ratio: 0.25
+cfg_scale: 7.5
 
 model:
   _target_: core.module.modules.dit.DiT
@@ -15,7 +16,7 @@ model:
   depth: 2
   condition_num: 0
   hidden_size: 64
-  class_dropout_prob: 0
+  class_dropout_prob: 0.1
 
 beta_schedule:
   start: 1e-4

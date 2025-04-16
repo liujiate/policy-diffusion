@@ -376,6 +376,9 @@ class MultitaskEpisode_DDPM(DDPM):
         input_params = {}
         output_params = {}
         time1 = time.time()
+        cfg_guidance_scale = getattr(self.config, "cfg_scale", 1.0) # Get from config or default to 1.0 (no guidance)
+        print("cfg_guidance_scale: ", cfg_guidance_scale)
+        
         for i, (task_name, task_config) in enumerate(self.task_cfg.tasks.items()):
             if self.validate_only_last_two and i < len(self.task_cfg.tasks) - 2:
                 continue
@@ -388,7 +391,7 @@ class MultitaskEpisode_DDPM(DDPM):
                     episode = episode[:num]
                 mu, logvar = self.episode_model.encode(episode)
                 cond = self.episode_model.reparameterize(mu, logvar)
-                cur_batch = self.generate(latent, cond=cond, num=num)
+                cur_batch = self.generate(latent, cond=cond, num=num, cfg_scale=cfg_guidance_scale)
                 #outputs = self.post_process(cur_batch, cond=condition)
                 output_params[task_name] = cur_batch
             elif self.load_clip:
@@ -403,7 +406,7 @@ class MultitaskEpisode_DDPM(DDPM):
                 image_features = self.clip_model.get_image_features(**clip_inputs)
                 cond = image_features.view(episode.shape[0], self.episode_len, -1).cuda()
 
-                cur_batch = self.generate(latent, cond=cond, num=num)
+                cur_batch = self.generate(latent, cond=cond, num=num, cfg_scale=cfg_guidance_scale)
                 output_params[task_name] = cur_batch
             elif self.load_vit:
                 input_params[task_name], episode = batch[i]
@@ -501,7 +504,7 @@ class MultitaskEpisode_DDPM(DDPM):
                 vit_features_reduced = self.vit_feature_reducer(vit_features)
                 
                 # 使用降维后的特征
-                cur_batch = self.generate(latent, cond=vit_features_reduced, num=num)
+                cur_batch = self.generate(latent, cond=vit_features_reduced, num=num, cfg_scale=cfg_guidance_scale)
                 output_params[task_name] = cur_batch
                 # except Exception as e:
                 #     print(f"验证时ViT处理出错: {e}")
@@ -517,7 +520,7 @@ class MultitaskEpisode_DDPM(DDPM):
                 condition = torch.full((batch[i].shape[0],), i).int().to(batch[i].device)
                 # latent = self.pre_process(input_params[task_name], cond=condition)
                 latent = input_params[task_name]
-                cur_batch = self.generate(latent, cond=condition, num=num)
+                cur_batch = self.generate(latent, cond=condition, num=num, cfg_scale=cfg_guidance_scale)
                 #outputs = self.post_process(cur_batch, cond=condition)
                 output_params[task_name] = cur_batch
             if save_param == True:
