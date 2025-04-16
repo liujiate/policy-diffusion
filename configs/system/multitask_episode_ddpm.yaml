@@ -6,6 +6,8 @@ validate_only_last_two: False
 load_clip: False
 load_vit: True
 episode_len: 10
+testing_erase: True
+erase_ratio: 0.25
 
 model:
   _target_: core.module.modules.dit.DiT

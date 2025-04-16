@@ -56,18 +56,20 @@ class DDPM(BaseSystem):
         self.register("posterior_mean_coef1", (betas * torch.sqrt(alphas_cumprod_prev) / (1 - alphas_cumprod)))
         self.register("posterior_mean_coef2", ((1 - alphas_cumprod_prev) * torch.sqrt(alphas) / (1 - alphas_cumprod)))
 
-    def generate(self, batch, num=10, history=False, cond=None):
+    def generate(self, batch, num=10, history=False, cond=None, cfg_scale=1.0):
         model = self.model.ema if hasattr(self.model, 'ema') else self.model
         model.eval()
         if len(batch.shape) > 2:
             shape = (num, 1, batch.shape[1] * batch.shape[2])
         else:
             shape = (num, 1, batch.shape[1])
+        shape = (num, *batch.shape[1:])
         sample = self.progressive_samples_fn_simple(
             model,
             shape,
             device='cuda',
             cond=cond,
+            cfg_scale=cfg_scale,
             include_x0_pred_freq=50,
             history=history,
         )
@@ -77,18 +79,18 @@ class DDPM(BaseSystem):
         return sample['samples']
 
 
-    def progressive_samples_fn_simple(self, model, shape, device, cond=None, include_x0_pred_freq=50, history=False):
-        samples, history = self.p_sample_loop_progressive_simple(
+    def progressive_samples_fn_simple(self, model, shape, device, cond=None, cfg_scale=1.0, include_x0_pred_freq=50, history=False):
+        samples, history_data = self.p_sample_loop_progressive_simple(
             model=model,
             shape=shape,
             cond=cond,
+            cfg_scale=cfg_scale,
             noise_fn=torch.randn,
             device=device,
             include_x0_pred_freq=include_x0_pred_freq,
-            # cond=cond,
         )
         if history:
-            return {'samples': samples, 'history': history}
+            return {'samples': samples, 'history': history_data}
         return {'samples': samples}
 
     def pre_process(self, batch, cond=None):
@@ -136,7 +138,7 @@ class DDPM(BaseSystem):
 
         # generate 200 models
         batch = self.pre_process(batch)
-        outputs = self.generate(batch, num=200)
+        outputs = self.generate(batch, num=20)
         params = self.post_process(outputs)
         accs = []
         for i in range(params.shape[0]):
@@ -331,17 +333,80 @@ class DDPM(BaseSystem):
                 extract(self.posterior_mean_coef2 / self.posterior_mean_coef1, t, x_t.shape) * x_t)
 
     # def p_sample(self, model, x, t, noise_fn, clip_denoised=True, return_pred_x0=False, lab=None):
-    def p_sample(self, model, x, t, noise_fn, cond=None, clip_denoised=True, return_pred_x0=False):
+    def p_sample(self, model, x, t, noise_fn, cond=None, cfg_scale=1.0, clip_denoised=True, return_pred_x0=False):
+        """
+        Sample the model for one step.
+
+        :param model: the model to use.
+        :param x: the current tensor at timestep t.
+        :param t: the value of t, starting at 0 for the first-noise step.
+        :param noise_fn: a function that generates noise.
+        :param cond: the conditional input. If provided and cfg_scale > 1.0, CFG is applied.
+        :param cfg_scale: the scale for classifier-free guidance.
+        :param clip_denoised: if True, clip the denoised signal to [-1, 1].
+        :param return_pred_x0: if True, return the predicted x_0 as well.
+        :return: a dict containing the following keys:
+                 - 'sample': the sampled tensor (shape like x).
+                 - 'pred_x0': the predicted x_0 (if return_pred_x0 is True).
+        """
         # pdb.set_trace()
-        mean, _, log_var, pred_x0 = self.p_mean_variance(model, x, t, clip_denoised, cond=cond, return_pred_x0=True)
+        B = x.shape[0] # Original batch size
 
-        noise                     = noise_fn(x.shape, dtype=x.dtype).to(x.device)
+        # --- Classifier-Free Guidance Logic ---
+        if cond is not None and cfg_scale > 1.0:
+            # 1. Prepare unconditional input (zero vector)
+            cond_uncond = torch.zeros_like(cond)
 
-        shape        = [x.shape[0]] + [1] * (x.ndim - 1)
-        nonzero_mask = (1 - (t == 0).type(torch.float32)).view(*shape).to(x.device)
-        sample       = mean + nonzero_mask * torch.exp(0.5 * log_var) * noise
+            # 2. Combine inputs for batched computation
+            x_combined = torch.cat([x, x], dim=0)           # Shape (2B, ...)
+            t_combined = torch.cat([t, t], dim=0)           # Shape (2B,)
+            cond_combined = torch.cat([cond, cond_uncond], dim=0) # Shape (2B, D)
 
-        sample = torch.clamp(sample, min=-1, max=1)
+            # 3. Call model once
+            #    IMPORTANT ASSUMPTION: model directly predicts noise 'eps'
+            if self.model_mean_type != 'eps':
+                # If model predicts x_0 or x_{t-1}, need to derive eps first
+                # For now, raise error if assumption is violated
+                raise NotImplementedError(f"CFG implementation currently assumes model_mean_type='eps', but got '{self.model_mean_type}'")
+            model_output_combined = model(x_combined, t_combined, cond=cond_combined) # Shape (2B, ...) should be eps prediction
+
+            # 4. Separate conditional and unconditional outputs
+            cond_eps, uncond_eps = model_output_combined.chunk(2, dim=0) # Each shape (B, ...)
+
+            # 5. Calculate guided noise prediction
+            # Formula: eps = uncond_eps + scale * (cond_eps - uncond_eps)
+            guided_eps = uncond_eps + cfg_scale * (cond_eps - uncond_eps)
+
+            # 6. Calculate pred_x0 using the guided noise
+            # Use original x and t, but guided_eps
+            pred_x0 = self.predict_start_from_noise(x, t, guided_eps)
+
+            if clip_denoised:
+                pred_x0 = pred_x0.clamp(min=-1, max=1)
+
+            # 7. Calculate model mean using the guided pred_x0
+            model_mean, _, model_log_variance = self.q_posterior_mean_variance(x_0=pred_x0, x_t=x, t=t)
+
+        else: # No guidance (cond is None or cfg_scale <= 1.0)
+            # Use the original p_mean_variance function to get predictions
+            # Pass the original condition (might be None)
+            model_mean, _, model_log_variance, pred_x0 = self.p_mean_variance(
+                model, x, t, clip_denoised=clip_denoised, cond=cond, return_pred_x0=True
+            )
+        # --- End CFG Logic ---
+
+
+        # --- Sampling Step (common to both cases) ---
+        noise = noise_fn(x.shape, dtype=x.dtype).to(x.device)
+
+        shape = [x.shape[0]] + [1] * (x.ndim - 1)
+        nonzero_mask = (1 - (t == 0).type(torch.float32)).view(*shape).to(x.device) # mask for t=0
+
+        # Calculate the sample using the potentially guided mean and log_variance
+        sample = model_mean + nonzero_mask * torch.exp(0.5 * model_log_variance) * noise
+
+        # Optional: Clamp the final sample
+        # sample = torch.clamp(sample, min=-1, max=1)
 
         # self.monitor.wandb_log({f'k60_noise_norm/{batch}': ((torch.exp(0.5 * log_var) * noise).norm().item())})
         # self.monitor.wandb_log({f'k60_noise_image/{batch}': wandb.Image(torch.exp(0.5 * log_var)* noise)})
@@ -350,12 +415,12 @@ class DDPM(BaseSystem):
 
     @torch.no_grad()
     # def p_sample_loop(self, model, shape, noise_fn=torch.randn, lab=None):
-    def p_sample_loop(self, model, shape, noise_fn=torch.randn, cond=None):
+    def p_sample_loop(self, model, shape, noise_fn=torch.randn, cond=None, cfg_scale=1.0):
 
 
         device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
         # shape[0] = lab.shape[0]
-        img    = noise_fn(10).to(device)
+        img = noise_fn(shape).to(device)
 
         for i in reversed(range(self.num_timesteps)):
             img = self.p_sample(
@@ -363,42 +428,57 @@ class DDPM(BaseSystem):
                 img,
                 torch.full((shape[0],), i, dtype=torch.int64).to(device),
                 noise_fn=noise_fn,
-                return_pred_x0=False,
                 cond=cond,
+                cfg_scale=cfg_scale,
+                return_pred_x0=False,
                 # lab=lab,
             )
 
         return img
 
     @torch.no_grad()
-    def p_sample_loop_progressive(self, model, shape, device, cond=None, noise_fn=torch.randn, include_x0_pred_freq=50):
+    # def p_sample_loop_progressive(self, model, shape, device, cond=None, noise_fn=torch.randn, include_x0_pred_freq=50):
+    def p_sample_loop_progressive(self, model, shape, device, cond=None, cfg_scale=1.0, noise_fn=torch.randn, include_x0_pred_freq=50):
 
         img = noise_fn(shape, dtype=torch.float32).to(device)
         num_recorded_x0_pred = self.num_timesteps // include_x0_pred_freq
-        x0_preds_            = torch.zeros((shape[0], num_recorded_x0_pred, *shape[1:]), dtype=torch.float32).to(device)
+        x0_preds_ = torch.zeros((shape[0], num_recorded_x0_pred, *shape[1:]), dtype=torch.float32).to(device)
 
         for i in reversed(range(self.num_timesteps)):
 
-            img, pred_x0 = self.p_sample(model=model,
-                                         x=img,
-                                         t=torch.full((shape[0],), i, dtype=torch.int64).to(device),
-                                         noise_fn=noise_fn,
-                                         cond=cond,
-                                         return_pred_x0=True,
-                                        #  lab=cond,
-                                         )
+            # img, pred_x0 = self.p_sample(model=model,
+            #                              x=img,
+            #                              t=torch.full((shape[0],), i, dtype=torch.int64).to(device),
+            #                              noise_fn=noise_fn,
+            #                              cond=cond,
+            #                              return_pred_x0=True,
+            #                              #  lab=cond,
+            #                              )
+            sample_output, pred_x0 = self.p_sample(model=model,
+                                                 x=img,
+                                                 t=torch.full((shape[0],), i, dtype=torch.int64).to(device),
+                                                 noise_fn=noise_fn,
+                                                 cond=cond,
+                                                 cfg_scale=cfg_scale,
+                                                 return_pred_x0=True)
+            img = sample_output # Update img with the sampled output
+
 
             # Keep track of prediction of x0
-            insert_mask = np.floor(i // include_x0_pred_freq) == torch.arange(num_recorded_x0_pred,
-                                                                              dtype=torch.int32,
-                                                                              device=device)
+            if i % include_x0_pred_freq == 0 or i == self.num_timesteps - 1: # Record more frequently or adjust logic
+                idx = i // include_x0_pred_freq
+                if 0 <= idx < num_recorded_x0_pred:
+                     x0_preds_[:, idx, ...] = pred_x0
 
-            insert_mask = insert_mask.to(torch.float32).view(1, num_recorded_x0_pred, *([1] * len(shape[1:])))
-            x0_preds_   = insert_mask * pred_x0[:, None, ...] + (1. - insert_mask) * x0_preds_
+            # Original logic for inserting - might be less intuitive if include_x0_pred_freq is not 1
+            # insert_mask = (torch.tensor(i // include_x0_pred_freq, device=device) == torch.arange(num_recorded_x0_pred, dtype=torch.int32, device=device))
+            # insert_mask = insert_mask.to(torch.float32).view(1, num_recorded_x0_pred, *([1] * (len(shape) -1 ))) # Adjusted dimension calculation
+            # x0_preds_ = insert_mask * pred_x0[:, None, ...] + (1. - insert_mask) * x0_preds_
+
 
         return img, x0_preds_
 
-    def p_sample_loop_progressive_simple(self, model, shape, device, cond=None, noise_fn=torch.randn,
+    def p_sample_loop_progressive_simple(self, model, shape, device, cond=None, cfg_scale=1.0, noise_fn=torch.randn,
                                          include_x0_pred_freq=50,input_pa=None,exp_step=None):
 
         # import pdb; pdb.set_trace()
@@ -406,8 +486,8 @@ class DDPM(BaseSystem):
         img = noise_fn(shape, dtype=torch.float32).to(device)
         if input_pa is not None:
             img = input_pa.repeat(shape[0],shape[1],1).to(device)
-        num_recorded_x0_pred = self.num_timesteps // include_x0_pred_freq
-        x0_preds_            = torch.zeros((shape[0], num_recorded_x0_pred, *shape[1:]), dtype=torch.float32).to(device)
+        # num_recorded_x0_pred = self.num_timesteps // include_x0_pred_freq # Not used here for history
+        # x0_preds_            = torch.zeros((shape[0], num_recorded_x0_pred, *shape[1:]), dtype=torch.float32).to(device) # Not used here
 
         history = []
         if exp_step is not None:
@@ -419,15 +499,22 @@ class DDPM(BaseSystem):
 
             # import pdb; pdb.set_trace()
             # Sample p(x_{t-1} | x_t) as usual
-            img, pred_x0 = self.p_sample(model=model,
-                                         x=img,
-                                         t=torch.full((shape[0],), i, dtype=torch.int64).to(device),
-                                         cond=cond,
-                                         noise_fn=noise_fn,
-                                         return_pred_x0=True,
-                                        #  lab=cond,
-                                         )
-
+            # img, pred_x0 = self.p_sample(model=model,
+            #                              x=img,
+            #                              t=torch.full((shape[0],), i, dtype=torch.int64).to(device),
+            #                              cond=cond,
+            #                              noise_fn=noise_fn,
+            #                              return_pred_x0=True,
+            #                             #  lab=cond,
+            #                              )
+            sample_output, pred_x0 = self.p_sample(model=model,
+                                                   x=img,
+                                                   t=torch.full((shape[0],), i, dtype=torch.int64).to(device),
+                                                   noise_fn=noise_fn,
+                                                   cond=cond,
+                                                   cfg_scale=cfg_scale,
+                                                   return_pred_x0=True)
+            img = sample_output # Update img
 
             history.append(img.detach().cpu())
         return img, history

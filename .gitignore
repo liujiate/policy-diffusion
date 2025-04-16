@@ -1,5 +1,6 @@
 /data/
 outputs/
+new_outputs/
 param_data/
 rl-baselines3-zoo/
 1.sh

@@ -10,6 +10,9 @@ from concurrent.futures import ProcessPoolExecutor
 from tqdm import tqdm
 
 import time
+import os
+import math
+import random
 
 from .base import BaseSystem
 from core.utils.ddpm import *
@@ -19,7 +22,7 @@ from .ddpm import DDPM
 import json
 from core.episode.episode_vae import EpisodeVAE
 from transformers import CLIPProcessor, CLIPModel
-from PIL import Image
+from PIL import Image, ImageDraw
 
 class MultitaskEpisode_DDPM(DDPM):
     def __init__(self, config, **kwargs):
@@ -41,6 +44,8 @@ class MultitaskEpisode_DDPM(DDPM):
         self.load_clip = getattr(config.system, "load_clip", None)
         self.episode_len = getattr(config.system, "episode_len", 30)
         self.num_gpus = torch.cuda.device_count()
+        self.testing_erase = getattr(config.system, "testing_erase", False)
+        self.erase_ratio = getattr(config.system, "erase_ratio", 0.25)
         if self.load_episode_vae:
             img_input_dim = 84 * 84 * 4  # Atari图像大小
             token_dim = 32
@@ -312,7 +317,7 @@ class MultitaskEpisode_DDPM(DDPM):
             dic = self.ae_validate_step(batch, 10)
         else:
             #self.maybe_load_all_model()
-            dic = self.ddpm_validate_step(batch, 1, save_param=True)
+            dic = self.ddpm_validate_step(batch, 20, save_param=False)
         return dic
 
     def ae_validate_step(self, batch, num):
@@ -403,10 +408,13 @@ class MultitaskEpisode_DDPM(DDPM):
             elif self.load_vit:
                 input_params[task_name], episode = batch[i]
                 latent = input_params[task_name]
+                if episode.shape[0] != num:
+                    episode = episode[:num]
                 
                 # 保持与training_step一致的处理方式
                 batch_size = episode.shape[0]
                 seq_len = episode.shape[1]
+                # print("batch_size: ", batch_size)
                 
                 # 为每个样本随机选择一帧
                 random_indices = torch.randint(0, seq_len, (batch_size,))
@@ -440,6 +448,34 @@ class MultitaskEpisode_DDPM(DDPM):
                         dummy = np.zeros((84, 84, 3), dtype=np.uint8)
                         pil_img = Image.fromarray(dummy, 'RGB')
                     
+                    # --- 新增：测试时随机擦除 ---
+                    if hasattr(self, 'trainer') and self.trainer.testing and self.testing_erase and pil_img: # 检查 self.trainer 是否存在
+                        try:
+                            img_w, img_h = pil_img.size # 应该是 84, 84
+                            area = img_w * img_h
+                            target_area = area * self.erase_ratio
+
+                            # 计算正方形边长
+                            side_length = int(round(math.sqrt(target_area)))
+
+                            # 确保边长不超过图像尺寸
+                            side_length = min(side_length, img_w, img_h)
+
+                            if side_length > 0: # 仅当边长大于0时才执行擦除
+                                # 随机确定正方形的左上角坐标
+                                top = random.randint(0, img_h - side_length)
+                                left = random.randint(0, img_w - side_length)
+                                print("top: ", top, "left: ", left, "side_length: ", side_length)
+
+                                draw = ImageDraw.Draw(pil_img)
+                                # 使用灰色进行填充
+                                erase_color = (128, 128, 128)
+                                draw.rectangle([left, top, left + side_length, top + side_length], fill=erase_color)
+                        except Exception as e:
+                             print(f"随机擦除失败: {e}")
+                    # --- 结束：测试时随机擦除 ---
+
+
                     random_frames.append(pil_img)
                 
                 # 使用ViT处理器处理图像

@@ -17,7 +17,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-Alien/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Alien/200/data.pt
       k: 200
       num_workers: 4
 
@@ -33,7 +33,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-BattleZone/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-BattleZone/200/data.pt
       k: 200
       num_workers: 4
 
@@ -49,7 +49,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-Boxing/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Boxing/200/data.pt
       k: 200
       num_workers: 4
 
@@ -65,7 +65,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-Jamesbond/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Jamesbond/200/data.pt
       k: 200
       num_workers: 4
 
@@ -81,7 +81,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-Kangaroo/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Kangaroo/200/data.pt
       k: 200
       num_workers: 4
 
@@ -97,7 +97,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-RoadRunner/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-RoadRunner/200/data.pt
       k: 200
       num_workers: 4
 
@@ -113,7 +113,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-Robotank/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Robotank/200/data.pt
       k: 200
       num_workers: 4
 
@@ -129,7 +129,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-Seaquest/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Seaquest/200/data.pt
       k: 200
       num_workers: 4
 
@@ -146,7 +146,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-Pong/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Pong/200/data.pt
       k: 200
       num_workers: 4
 
@@ -162,7 +162,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-Breakout/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Breakout/200/data.pt
       k: 200
       num_workers: 4
 
@@ -178,7 +178,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-Asteroids/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Asteroids/200/data.pt
       k: 200
       num_workers: 4
 
@@ -194,7 +194,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-Enduro/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Enduro/200/data.pt
       k: 200
       num_workers: 4
 
@@ -210,7 +210,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-MsPacman/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-MsPacman/200/data.pt
       k: 200
       num_workers: 4
 
@@ -226,7 +226,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-Qbert/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Qbert/200/data.pt
       k: 200
       num_workers: 4
 
@@ -242,7 +242,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-SpaceInvaders/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-SpaceInvaders/200/data.pt
       k: 200
       num_workers: 4
 
@@ -258,7 +258,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-Assault/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Assault/200/data.pt
       k: 200
       num_workers: 4
 
@@ -274,7 +274,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-Amidar/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Amidar/200/data.pt
       k: 200
       num_workers: 4
 
@@ -290,7 +290,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-CrazyClimber/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-CrazyClimber/200/data.pt
       k: 200
       num_workers: 4
 
@@ -306,7 +306,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-Freeway/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Freeway/200/data.pt
       k: 200
       num_workers: 4
 
@@ -322,7 +322,7 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-BeamRider/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-BeamRider/200/data.pt
       k: 200
       num_workers: 4
 
@@ -338,6 +338,6 @@ tasks:
       seed: 42
 
     param:
-      data_root: param_data/Atari_zoo/Atari-UpNDown/200/data.pt
+      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-UpNDown/200/data.pt
       k: 200
       num_workers: 4

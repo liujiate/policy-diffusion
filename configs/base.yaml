@@ -11,9 +11,11 @@ device:
   id: [0]
   #cuda: cuda:${device.id}
 
-load_system_checkpoint: "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/new_outputs/mix20/noae_ddpmepisodecondition_dropout0.1_ps32/20240809-053659-seed42/multitask_episode_ddpm/checkpoints/ddpm-epoch=44999-mean_g_acc=0.1695.ckpt"
-#load_system_checkpoint: "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/new_outputs/mix5/noae_ddpmepisodecondition_ps32/20240724-065355-seed42/multitask_episode_ddpm/checkpoints/ddpm-epoch=49999-mean_g_acc=0.7249.ckpt"
-mode: train
+# load_system_checkpoint: 
+# load_system_checkpoint: "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/new_outputs/mix20/noae_ddpmepisodecondition_dropout0.1_ps32/20240809-053659-seed42/multitask_episode_ddpm/checkpoints/ddpm-epoch=44999-mean_g_acc=0.1695.ckpt"
+# load_system_checkpoint: "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/new_outputs/mix5/noae_ddpmepisodecondition_ps32/20240724-065355-seed42/multitask_episode_ddpm/checkpoints/ddpm-epoch=49999-mean_g_acc=0.7249.ckpt"
+load_system_checkpoint: "/mnt/kaiwu-group-x3/jiateliu/ongoing/policy-diffusion/new_outputs/mix/20250401-123419-seed42/multitask_episode_ddpm/checkpoints/ddpm-epoch=79999-mean_g_acc=0.4731.ckpt"
+mode: test
 
 seed: 42
 process_title: PDN

@@ -69,7 +69,7 @@ class MultitaskRL(BaseTask):
         return task_data
 
     def set_param_data(self):
-        if self.cfg.load_episode_vae:
+        if True or self.cfg.load_episode_vae: #TODO:修改
             self.pdata = MultitaskEpisodePData(self.cfg)
         else:
             self.pdata = MultitaskPData(self.cfg)
