@@ -44,7 +44,7 @@ class MultitaskAE_DDPM(DDPM):
             num_layers = 2
             img_output_dim = 84 * 84 * 4  # Atari图像大小
             patch_size = 84
-            episode_vae_path = "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/episode_outputs/5-1/vae-epoch=491-val_loss=0.16.ckpt"
+            episode_vae_path = "/home/llm_user/yxh/policy-diffusion/models/episode_outputs/5-1/vae-epoch=491-val_loss=0.16.ckpt"
             self.episode_model = EpisodeVAE(img_input_dim, token_dim, hidden_dim, latent_dim, num_heads, num_layers, img_output_dim, patch_size=patch_size, only_ae=True)
             checkpoint = torch.load(episode_vae_path)
             self.episode_model.load_state_dict(checkpoint['state_dict'])

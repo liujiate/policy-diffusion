@@ -55,7 +55,7 @@ class MultitaskEpisode_DDPM(DDPM):
             num_layers = 2
             img_output_dim = 84 * 84 * 4  # Atari图像大小
             patch_size = 84
-            episode_vae_path = "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/episode_outputs/5-1/vae-epoch=313-val_loss=0.02.ckpt"
+            episode_vae_path = "/home/llm_user/yxh/policy-diffusion/models/episode_outputs/5-1/vae-epoch=313-val_loss=0.02.ckpt"
             self.episode_model = EpisodeVAE(img_input_dim, token_dim, hidden_dim, latent_dim, num_heads, num_layers, img_output_dim, patch_size=patch_size, only_ae=True)
             checkpoint = torch.load(episode_vae_path)
             self.episode_model.load_state_dict(checkpoint['state_dict'])
@@ -73,7 +73,7 @@ class MultitaskEpisode_DDPM(DDPM):
             #     print(f"{name} is on {param.device}")
         self.load_vit = getattr(config.system, "load_vit", None)
         if self.load_vit:
-            vit_model_name = "/mnt/kaiwu-group-x3/jiateliu/models/vit-base-patch16-224"  # 如使用huggingface的vit-base-patch16-224
+            vit_model_name = "/home/llm_user/yxh/policy-diffusion/models/vit-base-patch16-224"  # 如使用huggingface的vit-base-patch16-224
             from transformers import ViTImageProcessor, ViTModel
             self.vit_model = ViTModel.from_pretrained(vit_model_name)
             self.vit_model.cuda()
@@ -312,9 +312,11 @@ class MultitaskEpisode_DDPM(DDPM):
     #     self.trainer.strategy.barrier()
     
     def test_step(self, batch, batch_idx, **kwargs: Any):
+        # 如果当前epoch小于等于split_epoch且trainer不在测试状态，则调用ae_validate_step函数
         if self.current_epoch <= self.split_epoch and not self.trainer.testing:
             #self.maybe_load_ae_model()
             dic = self.ae_validate_step(batch, 10)
+        # 否则调用ddpm_validate_step函数
         else:
             #self.maybe_load_all_model()
             dic = self.ddpm_validate_step(batch, 20, save_param=False)
@@ -524,7 +526,7 @@ class MultitaskEpisode_DDPM(DDPM):
                 #outputs = self.post_process(cur_batch, cond=condition)
                 output_params[task_name] = cur_batch
             if save_param == True:
-                path = f"/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/{task_name}/200"
+                path = f"/home/llm_user/yxh/policy-diffusion/models/param_data/Atari_zoo/{task_name}/200"
                 torch.save(output_params[task_name], f"{path}/generate_param.pt")
 
 
