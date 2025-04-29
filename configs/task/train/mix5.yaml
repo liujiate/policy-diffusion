@@ -5,98 +5,98 @@ load_episode_vae: True
 episode_len: 10
 
 tasks:
-  Atari-Alien:
+  Atari-AirRaid:
     train:
       alg:
         _target_: stable_baselines3.PPO
         policy: CnnPolicy
     env:
-      name: AlienNoFrameskip-v4
+      name: AirRaidNoFrameskip-v4
       n_eval_episodes: 10
       num_envs: 10
       seed: 42
 
     param:
-      data_root:  /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Alien/200/data.pt
+      data_root: ${project_root}/param_data/Atari_zoo/Atari-AirRaid/200/data.pt
       k: 200
       num_workers: 4
 
-  Atari-Amidar:
+  Atari-BeamRider:
     train:
       alg:
         _target_: stable_baselines3.PPO
         policy: CnnPolicy
     env:
-      name: AmidarNoFrameskip-v4
+      name: BeamRiderNoFrameskip-v4
       n_eval_episodes: 10
       num_envs: 10
       seed: 42
 
     param:
-      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Amidar/200/data.pt
+      data_root: ${project_root}/param_data/Atari_zoo/Atari-BeamRider/200/data.pt
       k: 200
       num_workers: 4
 
-  Atari-Assault:
+  Atari-Breakout:
     train:
       alg:
         _target_: stable_baselines3.PPO
         policy: CnnPolicy
     env:
-      name: AssaultNoFrameskip-v4
+      name: BreakoutNoFrameskip-v4
       n_eval_episodes: 10
       num_envs: 10
       seed: 42
 
     param:
-      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Assault/200/data.pt
+      data_root: ${project_root}/param_data/Atari_zoo/Atari-Breakout/200/data.pt
       k: 200
       num_workers: 4
 
-  # Atari-Asteroids:
-  #   train:
-  #     alg:
-  #       _target_: stable_baselines3.PPO
-  #       policy: CnnPolicy
-  #   env:
-  #     name: AsteroidsNoFrameskip-v4
-  #     n_eval_episodes: 10
-  #     num_envs: 10
-  #     seed: 42
+  Atari-Enduro:
+    train:
+      alg:
+        _target_: stable_baselines3.PPO
+        policy: CnnPolicy
+    env:
+      name: EnduroNoFrameskip-v4
+      n_eval_episodes: 10
+      num_envs: 10
+      seed: 42
 
-  #   param:
-  #     data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Asteroids/200/data.pt
-  #     k: 200
-  #     num_workers: 4
+    param:
+      data_root: ${project_root}/param_data/Atari_zoo/Atari-Enduro/200/data.pt
+      k: 200
+      num_workers: 4
 
-  # Atari-BattleZone:
-  #   train:
-  #     alg:
-  #       _target_: stable_baselines3.PPO
-  #       policy: CnnPolicy
-  #   env:
-  #     name: BattleZoneNoFrameskip-v4
-  #     n_eval_episodes: 10
-  #     num_envs: 10
-  #     seed: 42
+  Atari-Jamesbond:
+    train:
+      alg:
+        _target_: stable_baselines3.PPO
+        policy: CnnPolicy
+    env:
+      name: JamesbondNoFrameskip-v4
+      n_eval_episodes: 10
+      num_envs: 10
+      seed: 42
 
-  #   param:
-  #     data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-BattleZone/200/data.pt
-  #     k: 200
-  #     num_workers: 4
+    param:
+      data_root: ${project_root}/param_data/Atari_zoo/Atari-Jamesbond/200/data.pt
+      k: 200
+      num_workers: 4
 
-  # Atari-BeamRider:
-  #   train:
-  #     alg:
-  #       _target_: stable_baselines3.PPO
-  #       policy: CnnPolicy
-  #   env:
-  #     name: BeamRiderNoFrameskip-v4
-  #     n_eval_episodes: 10
-  #     num_envs: 10
-  #     seed: 42
+  Atari-Kangaroo:
+    train:
+      alg:
+        _target_: stable_baselines3.PPO
+        policy: CnnPolicy
+    env:
+      name: KangarooNoFrameskip-v4
+      n_eval_episodes: 10
+      num_envs: 10
+      seed: 42
 
-  #   param:
-  #     data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-BeamRider/200/data.pt
-  #     k: 200
-  #     num_workers: 4
+    param:
+      data_root: ${project_root}/param_data/Atari_zoo/Atari-Kangaroo/200/data.pt
+      k: 200
+      num_workers: 4

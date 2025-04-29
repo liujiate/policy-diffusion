@@ -480,7 +480,7 @@ class DDPM(BaseSystem):
         nonzero_mask = (t != 0).float().view(-1, *([1] * (len(x.shape) - 1)))
         sample = mean_pred + nonzero_mask * sigma * noise
 
-        return sample, pred_x0
+        return (sample, pred_x0) if return_pred_x0 else sample
 
     def ddim_sample_loop(
         self,
@@ -509,7 +509,6 @@ class DDPM(BaseSystem):
                     model,
                     img,
                     t,
-                    noise_fn=noise_fn,
                     cond_fn=cond_fn,
                     cond=cond,
                     return_pred_x0=False,
@@ -552,9 +551,9 @@ class DDPM(BaseSystem):
                     model,
                     img,
                     t,
-                    noise_fn=noise_fn,
                     cond_fn=cond_fn,
                     cond=cond,
+                    return_pred_x0=True
                 )
             img = sample_output # Update img with the sampled output
 

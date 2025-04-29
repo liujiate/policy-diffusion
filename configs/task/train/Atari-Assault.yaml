@@ -17,7 +17,7 @@ tasks:
       seed: 42
 
     param:
-      #data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Assault/200/episodes_data2.pkl
-      data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Assault/200/data.pt
+      #data_root: ${project_root}/param_data/Atari_zoo/Atari-Assault/200/episodes_data2.pkl
+      data_root: ${project_root}/param_data/Atari_zoo/Atari-Assault/200/data.pt
       k: 200
       num_workers: 4

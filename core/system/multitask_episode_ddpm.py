@@ -55,7 +55,7 @@ class MultitaskEpisode_DDPM(DDPM):
             num_layers = 2
             img_output_dim = 84 * 84 * 4  # Atari图像大小
             patch_size = 84
-            episode_vae_path = "/home/llm_user/yxh/policy-diffusion/models/episode_outputs/5-1/vae-epoch=313-val_loss=0.02.ckpt"
+            episode_vae_path = os.path.join(self.config.project_root, "episode_outputs/5-1/vae-epoch=313-val_loss=0.02.ckpt")
             self.episode_model = EpisodeVAE(img_input_dim, token_dim, hidden_dim, latent_dim, num_heads, num_layers, img_output_dim, patch_size=patch_size, only_ae=True)
             checkpoint = torch.load(episode_vae_path)
             self.episode_model.load_state_dict(checkpoint['state_dict'])
@@ -69,18 +69,39 @@ class MultitaskEpisode_DDPM(DDPM):
             self.clip_model.cuda()
             self.clip_model.eval()
             self.processor = CLIPProcessor.from_pretrained(model_name)
-            # for name, param in self.clip_model.named_parameters():
-            #     print(f"{name} is on {param.device}")
+         
         self.load_vit = getattr(config.system, "load_vit", None)
         if self.load_vit:
-            vit_model_name = "/home/llm_user/yxh/policy-diffusion/models/vit-base-patch16-224"  # 如使用huggingface的vit-base-patch16-224
+            # Use official Hugging Face model ID with backup offline path
+            vit_model_name = "vit-base-patch16-224"  # Local model name
+            vit_model_id = "google/vit-base-patch16-224"  # Hugging Face model ID
+            
             from transformers import ViTImageProcessor, ViTModel
-            self.vit_model = ViTModel.from_pretrained(vit_model_name)
+            try:
+                # Try loading from local path first
+                print("Attempting to load ViT model from local cache...")
+                self.vit_model = ViTModel.from_pretrained(vit_model_name, local_files_only=True)
+                self.vit_processor = ViTImageProcessor.from_pretrained(vit_model_name, local_files_only=True)
+            except Exception as local_err:
+                print(f"Local load failed: {local_err}")
+                try:
+                    # Try downloading from Hugging Face
+                    print(f"Downloading ViT model from Hugging Face: {vit_model_id}")
+                    self.vit_model = ViTModel.from_pretrained(vit_model_id, force_download=True)
+                    self.vit_processor = ViTImageProcessor.from_pretrained(vit_model_id, force_download=True)
+                    
+                    # Save for future use
+                    print("Saving model locally...")
+                    self.vit_model.save_pretrained(vit_model_name)
+                    self.vit_processor.save_pretrained(vit_model_name)
+                except Exception as e:
+                    print(f"Error downloading ViT model: {e}")
+                    raise
+
             self.vit_model.cuda()
             self.vit_model.eval()
-            self.vit_processor = ViTImageProcessor.from_pretrained(vit_model_name)
             
-            # 添加特征降维层，将ViT的768维特征降至模型所需的hidden_size维度
+            # Add dimension reduction layer
             self.vit_feature_reducer = nn.Linear(768, self.model.hidden_size)
             self.vit_feature_reducer.cuda()
 

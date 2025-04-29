@@ -9,7 +9,7 @@ import random
 import numpy as np
 from pytorch_lightning.callbacks import ModelCheckpoint, TQDMProgressBar
 from pytorch_lightning.loggers import TensorBoardLogger
-
+import os
 
 class AtariDataset(Dataset):
     def __init__(self, data_files, transform=None):
@@ -211,33 +211,47 @@ if __name__ == '__main__':
 
     # 数据加载和预处理
     #data_files = ["/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Assault/200/episodes_data_test.pkl"]
-    data_files = ["/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Alien/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Amidar/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Assault/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Asteroids/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-BattleZone/200/episodes_data2.pkl",
+    data_files = [
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-Alien/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-Amidar/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-Assault/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-Asteroids/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-BattleZone/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-Boxing/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-Breakout/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-CrazyClimber/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-Enduro/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-Freeway/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-Jamesbond/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-Kangaroo/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-MsPacman/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-Pong/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-Qbert/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-RoadRunner/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-Robotank/200/episodes_data2.pkl"),
+        os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-Seaquest/200/episodes_data2.pkl"),
+    ]
 
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Boxing/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Breakout/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-CrazyClimber/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Enduro/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Freeway/200/episodes_data2.pkl",
-
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Jamesbond/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Kangaroo/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-MsPacman/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Pong/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Qbert/200/episodes_data2.pkl",
-
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-RoadRunner/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Robotank/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Seaquest/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-SpaceInvaders/200/episodes_data2.pkl",
-                  "/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-BeamRider/200/episodes_data2.pkl",
-                  ]
-
-    val_data_files = ["/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-UpNDown/200/episodes_data2.pkl",
-
+    val_data_files = [os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "param_data/Atari_zoo/Atari-UpNDown/200/episodes_data2.pkl"),
 
                       ]
     transform = transforms.Compose([
@@ -265,8 +279,8 @@ if __name__ == '__main__':
     img_output_dim = 84 * 84 * 4  # Atari图像大小
     patch_size = 84
 
-    save_dir = '/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/episode_outputs/20-1/'
-    #save_dir = '/mnt/kaiwu-group-x3/jiateliu/policy-diffusion/episode_outputs/Atari-Assault/'
+    save_dir = os.path.join(os.environ.get('PROJECT_ROOT', os.getcwd()), 
+                    "episode_outputs/20-1/")
 
     # 初始化模型
     model = EpisodeVAE(img_input_dim, token_dim, hidden_dim, latent_dim, num_heads, num_layers, img_output_dim, patch_size=patch_size, only_ae=True)

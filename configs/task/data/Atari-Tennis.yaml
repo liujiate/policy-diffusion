@@ -5,7 +5,7 @@ exp_name: Atari-Tennis
 train:
   eval_freq: 5000
   save_model_num: 200
-  save_path: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/${task.exp_name}/200
+  save_path: ${project_root}/param_data/Atari_zoo/${task.exp_name}/200
   algo: ppo
   alg:
     _target_: stable_baselines3.PPO
@@ -23,7 +23,7 @@ env:
   seed: 42
 
 param:
-    data_root: /mnt/kaiwu-group-x3/jiateliu/policy-diffusion/param_data/Atari_zoo/Atari-Tennis/200/data.pt
+    data_root: ${project_root}/param_data/Atari_zoo/Atari-Tennis/200/data.pt
     k: 200
     num_workers: 4
 
